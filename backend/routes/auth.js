@@ -3,6 +3,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -61,6 +62,28 @@ router.post("/signup", async (req, res) => {
 
     console.error("Signup error:", error.message);
     res.status(500).json({ message: "Could not create account." });
+  }
+});
+
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select("name email role");
+    if (!user) return res.status(404).json({ message: "Account not found." });
+    res.json({ user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+  } catch {
+    res.status(500).json({ message: "Could not load account." });
+  }
+});
+
+router.get("/users", authMiddleware, async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Administrator access required." });
+  }
+  try {
+    const users = await User.find().select("name email role createdAt").sort({ createdAt: -1 }).lean();
+    res.json(users);
+  } catch {
+    res.status(500).json({ message: "Could not fetch users." });
   }
 });
 
